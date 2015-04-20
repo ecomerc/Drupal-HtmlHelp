@@ -1,0 +1,27 @@
+
+.q {
+     border: 2px solid #2b76af; padding: 1em;margin: 10px 80px}
+.readabout {
+    font-weight: bold;
+}
+.misfit {
+    color: #FF0000; font-style: italic;
+}
+.menu {
+    display:block;
+}
+.clDivsoc,.clDivs7,.clDivsh {
+    display:inline;
+}
+
+p {margin-bottom: 1em; }
+
+
+ul#myMenu div.arrow {display: block; width: 10px; height: 1em; margin-top: 1px;}
+ul#myMenu li {margin: 0 0 0 1em; padding: 0 0 0 0; background:none;}
+ul#myMenu ul {margin: 0 0 0 0; padding: 0 0 0 0; } 
+ul#myMenu li.index_closed{list-style-type: none;}
+ul#myMenu li.index_closed > a.expand {background: url(bullet.expand.closed.gif) left bottom no-repeat; float: left;}
+ul#myMenu li.index_item{list-style-type: none;  background: url(bullet.expand.item.gif) left center no-repeat; padding-left: 10px; }
+ul#myMenu li.index_open{list-style-type: none; }
+ul#myMenu li.index_open > a.expand {background: url(bullet.expand.open.gif) left bottom no-repeat;  float: left; }

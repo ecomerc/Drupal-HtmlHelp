@@ -1,0 +1,5 @@
+; $Id$
+package = EcoMerc Custom
+name = HTML Help Viewer
+description = "Display a HTML file"
+core = 6.x

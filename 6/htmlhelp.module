@@ -1,0 +1,272 @@
+<?php
+
+function htmlhelp_help($path, $arg) {
+  switch ($path) {
+    case 'admin/modules#description':
+      return t('Replace internal Drupal or external Web links using [l:URL text] input tags.');
+    case 'admin/help#htmlhelp';
+      return t('Enables users easily add links within wysiwyg editors.');
+    case 'admin/settings/htmlhelp':
+      return t('Here you can configure the view htmlhelp uses to provide the list of nodes within TinyMCE.  To change the configuration of the view visit the Views <a href="!url" >configuration page</a>.', array('!url' => url('admin/build/views')));
+  }
+} 
+
+
+function htmlhelp_theme() {
+  return array(
+    'htmlhelp_small' => array(
+      'template' => 'htmlhelp-small',
+      'arguments' => array('content' => NULL),
+    ),
+    'htmlhelp_page' => array(
+      'template' => 'htmlhelp-page',
+      'arguments' => array('page' => NULL),
+    ),
+  );
+}
+
+
+function htmlhelp_init() {
+    drupal_add_css(drupal_get_path('module', 'htmlhelp') .'/htmlhelp.css', 'module');
+    if (arg(0) == "help2" ) {
+        $old = menu_get_item();
+        $new = menu_get_item('help');
+        $old['href'] = $new['href'];
+        menu_set_item('help2', $old);
+    } elseif (arg(0) == "search" && arg(1) == "htmlhelp" ) {
+        //die($_GET["q"]);
+        $old = menu_get_item();
+        $new = menu_get_item('help');
+        $old['href'] = $new['href'];
+        menu_set_item($_GET["q"], $old);
+    } elseif (arg(0) == "search" ) {
+        //die($_GET["q"]);
+        $old = menu_get_item();
+        $new = menu_get_item('node/5');
+        $old['href'] = $new['href'];
+        menu_set_item($_GET["q"], $old);
+        $breadcrumb = drupal_get_breadcrumb();
+        drupal_set_breadcrumb($breadcrumb);
+    }
+    
+}
+
+
+function htmlhelp_page_title($account) {
+}
+
+function htmlhelp_menu() {
+  $items = array();
+
+  $items['help'] = array(
+    'title' => 'Help File',
+    'page callback' => 'htmlhelp_view',
+    'access arguments' => array('access content'),
+    'file' => 'help.pages.inc',
+    'type' => MENU_CALLBACK,
+  );
+  
+  $items['help2'] = array(
+    'title' => 'Help File',
+    'page callback' => 'htmlhelp_view',
+    'access arguments' => array('access content'),
+    'file' => 'help.pages.inc',
+    'type' => MENU_CALLBACK,
+  );
+  
+  $items['admin/settings/htmlhelp'] = array(
+    'title' => 'htmlhelp',
+    'description' => 'Change settings for the htmlhelp module.',
+    'page callback' => 'drupal_get_form',
+    'page arguments' => array('htmlhelp_admin_settings'),
+    'access arguments' => array('administer site configuration'),
+  );
+  return $items;
+}
+
+
+// Implementation of hook_settings()
+function htmlhelp_admin_settings() {
+
+
+  $form['htmlhelp_location'] = array(
+    '#type' => 'textfield', '#size' => 20, '#maxlength' => 50,
+    '#title' => t('Choose a file location where the htmlhelp projects are stored'),
+    '#default_value' => variable_get('htmlhelp_location', 'storage'),
+  );
+  
+  $form["htmlhelp_default"] = array(
+    '#type' => 'textfield', '#size' => 20, '#maxlength' => 20,
+    '#title' => t('Default Help Project'),
+    '#default_value' => variable_get('htmlhelp_default', '9'),
+    '#description' => t('Folder in storage location that will be used as default help project'));
+
+
+  return system_settings_form($form);
+}
+
+
+/**
+ * Implementation of hook_search().
+ */
+function htmlhelp_search($op = 'search', $keys = NULL) {
+  $version = "orgcon9";
+  $v = "9";
+  
+  switch ($op) {
+    case 'name':
+      return t('Help Page');
+
+    case 'reset':
+      db_query("DELETE {search_dataset} WHERE type = 'htmlhelp'");
+      return;
+
+    case 'status':
+    
+      $total = count (_htmlhelp_getpages($v, $version));
+      $remaining = $total - db_result(db_query("SELECT COUNT(*) FROM {search_dataset} d WHERE d.type = 'htmlhelp' AND d.reindex = 0"));
+      return array('remaining' => $remaining, 'total' => $total);
+
+    case 'admin':
+      
+
+    case 'search':
+      include_once("help.pages.inc");
+      
+      // Do search.
+      //$keywords, $type, $join1 = '', $where1 = '1 = 1', $arguments1 = array(), $columns2 = 'i.relevance AS score', $join2 = '',
+      $find = do_search($keys, 'htmlhelp');
+      $pages = _htmlhelp_getpages($v, $version);
+
+      // Load results.
+      $results = array();
+      foreach ($find as $item) {
+        //print_r($item);
+        $url = $pages[$item->sid];
+        $curl = _htmlhelp_clean_url($url, $v, $version);
+        $content = _htmlhelp_load_page($curl, $v, $version, $title);
+        //$content = "<h1>".$title."</h1>" . $content . "|" . $url;
+        $results[] = array(
+          'link' => url(_htmlhelp_clean_url_inline("",$url, $v ), array('absolute' => true)),
+          'type' => 'htmlhelp',
+          'title' => $title,
+          'score' => $item->score / 2,
+          'snippet' => search_excerpt($keys, $content),
+        );
+        
+      }
+      return $results;
+  }
+}
+
+// compare two values on length 
+function _htmlhelp_sort_search_results($arg1, $arg2) { 
+    if ($arg1['score'] < $arg2['score']) { 
+        return 1; 
+    }  elseif ($arg1['score'] == $arg2['score']) { 
+        return 0; 
+    } else  { 
+        return -1; 
+    } 
+} 
+
+
+
+function search_all_data($keys = NULL) {
+//fsfsdf\\
+
+    //print_r ( do_search("orgcon", 'node', '', '1 = 1', array("#", "#", "#"), 'i.relevance AS score FROM {search_index}; #'));
+
+    //die();
+    global $pager_total_items, $pager_page_array, $pager_total, $pager_limit;
+	
+    if (isset($keys)) {
+      $element = 0;
+      $limit = 10;
+      $page = $_GET['page'];
+      $pager_limit = 999;
+      $_GET['page'] = 0;
+      $results1 = module_invoke('node', 'search', 'search', $keys);
+      $results2 = module_invoke('htmlhelp', 'search', 'search', $keys);
+      
+      $results = array_merge($results1, $results2);
+      
+      
+      $_GET['page'] = $page;
+      $pager_limit = 10;
+      $pager_page_array = explode(',', $page);
+      $pager_total_items[$element] = count($results);
+      $pager_total[$element] = ceil($pager_total_items[$element] / $limit);
+      $pager_page_array[$element] = max(0, min((int)$pager_page_array[$element], ((int)$pager_total[$element]) - 1));
+  
+      usort($results, "_htmlhelp_sort_search_results"); 
+      
+      $results = array_slice ( $results , $pager_page_array[$element] * $limit, $limit , true );
+      
+      if (isset($results) && is_array($results) && count($results)) {
+        if (module_hook('node', 'search_page')) {
+          return module_invoke('node', 'search_page', $results);
+        }
+        else {
+          return theme('search_results', $results, 'node');
+        }
+
+      }
+    }
+}
+
+/**
+ * Implementation of hook_update_index().
+ */
+
+function htmlhelp_update_index() {
+    include_once("help.pages.inc");
+
+	
+	//TODO: LOAD THIS FROM SETTINGS
+    $version = "orgcon9";
+    $v = "9";
+    $limit = (int)variable_get('search_cron_limit', 100);
+    
+    
+    $pages = _htmlhelp_getpages($v, $version);
+    $result = db_query("SELECT sid FROM {search_dataset} d WHERE d.type = 'htmlhelp' AND d.reindex = 0");
+
+    while ($page = db_fetch_object($result)) {
+        unset($pages[$page->sid]);
+    }
+    
+    $pages = array_slice ( $pages , 0 , $limit , true );
+    foreach ($pages as $id => $url) {
+        _htmlhelp_index_page($id, $url, $v, $version);
+        
+    }
+}
+
+function _htmlhelp_getpages($v, $version) {
+
+    $drupal_path = dirname($_SERVER['SCRIPT_FILENAME']);
+    $filename =  $drupal_path ."/". $version."/help/OrgCon help.hhp";
+
+    $fd = fopen ($filename, "r");
+    $contents = fread ($fd, filesize ($filename));
+    fclose ($fd);
+
+
+    preg_match("/\[files\]([^\[]*)/i", $contents, $search);
+    $body = $search[1];
+    preg_match_all("/^.+\\\\.+\.(?:html|htm)/im", $body, $search);
+    return $search[0] ;
+}
+
+function _htmlhelp_index_page($id, $curl, $v, $version) {
+    $url = _htmlhelp_clean_url($curl, $v, $version);
+
+    $content = _htmlhelp_load_page($url, $v, $version, $title);
+    
+    
+    $vowels = array("-", "_", "/", "\\", ".html", ".htm");
+    $content = "<h1>".$title."</h1>" . $content . " " . str_replace($vowels, " ", $curl);
+    search_index($id, 'htmlhelp', $content);
+}
+
